@@ -33,7 +33,7 @@ const AutoHeightImage = (props) => {
       // image height could not be `0`
       try {
         const localUpdateSequence = ++updateSequence;
-        const { height } = await getImageSizeFitWidth(source, width);
+        const { height } = getImageSizeFitWidth(source, width);
         if (localUpdateSequence !== updateSequence) {
           return;
         }

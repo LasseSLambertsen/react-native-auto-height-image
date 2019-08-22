@@ -42,6 +42,9 @@ const loadImageSize = (image) => {
         reject
       );
     }
+  })
+  .then((dimensions) => {
+      return dimensions;
   });
 };
 
@@ -58,14 +61,14 @@ export const getImageSizeFitWidthFromCache = (image, toWidth) => {
 const getImageSizeMaybeFromCache = async (image) => {
   let size = getImageSizeFromCache(image);
   if (!size) {
-    size = await loadImageSize(image);
+    size = loadImageSize(image);
     cache.set(image, size);
   }
   return size;
 };
 
 export const getImageSizeFitWidth = async (image, toWidth) => {
-  const { width, height } = await getImageSizeMaybeFromCache(image);
+  const { width, height } = getImageSizeMaybeFromCache(image);
   if (!width || !height) return { width: 0, height: 0 }
   return { width: toWidth, height: toWidth * height / width };
 };
