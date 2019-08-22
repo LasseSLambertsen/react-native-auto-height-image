@@ -3,7 +3,7 @@
  * @author vivaxy
  */
 
-import React, { PureComponent } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'react-native-android-image-polyfill';
 import { StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
@@ -14,88 +14,91 @@ import { NOOP, DEFAULT_HEIGHT } from './helpers';
 // remove `resizeMode` props from `Image.propTypes`
 const { resizeMode, ...ImagePropTypes } = Image.propTypes;
 
-export default class AutoHeightImage extends PureComponent {
-  static propTypes = {
-    ...ImagePropTypes,
-    width: PropTypes.number.isRequired,
-    onHeightChange: PropTypes.func
-  };
+const AutoHeightImage = (props) => {
+  const { source, style, width, onHeightChange, ...restProps } = props;
 
-  static defaultProps = {
-    onHeightChange: NOOP
-  };
+  let updateSequence = 0;
+  let hasMounted = false;
+  let styles = {};
 
-  constructor(props) {
-    super(props);
-    this.setInitialImageHeight();
-  }
+  const [prevProps, setPrevProps] = useState(props);
+  const [height, setHeight] = useState(0);
 
-  updateSequence = 0;
+  const updateImageHeight = () => {
+    if (
+      height === DEFAULT_HEIGHT ||
+      prevProps.width !== props.width ||
+      prevProps.source !== props.source
+    ) {
+      // image height could not be `0`
+      try {
+        const localUpdateSequence = ++updateSequence;
+        const { height } = await getImageSizeFitWidth(source, width);
+        if (localUpdateSequence !== updateSequence) {
+          return;
+        }
 
-  async componentDidMount() {
-    this.hasMounted = true;
-    await this.updateImageHeight(this.props);
-  }
+        styles = StyleSheet.create({ image: { width, height } });
+        if (hasMounted) {
+          // guard `this.setState` to be valid
+          setHeight(height);
+          onHeightChange(height);
+        }
+      } catch (ex) {
+        if (props.onError) {
+          props.onError(ex);
+        }
+      }
+    }
 
-  async componentWillReceiveProps(nextProps) {
-    await this.updateImageHeight(nextProps);
-  }
-
-  componentWillUnmount() {
-    this.hasMounted = false;
-    // clear memory usage
-    this.updateSequence = null;
-  }
-
-  setInitialImageHeight() {
-    const { source, width, onHeightChange } = this.props;
+  const setInitialImageHeight = () => {
     const { height = DEFAULT_HEIGHT } = getImageSizeFitWidthFromCache(
       source,
       width
     );
-    this.state = { height };
-    this.styles = StyleSheet.create({ image: { width, height } });
+    setHeight(height);
+    styles = StyleSheet.create({ image: { width, height } });
     onHeightChange(height);
-  }
+  };
 
-  async updateImageHeight(props) {
-    if (
-      this.state.height === DEFAULT_HEIGHT ||
-      this.props.width !== props.width ||
-      this.props.source !== props.source
-    ) {
-      // image height could not be `0`
-      const { source, width, onHeightChange } = props;
-      try {
-        const updateSequence = ++this.updateSequence;
-        const { height } = await getImageSizeFitWidth(source, width);
-        if (updateSequence !== this.updateSequence) {
-          return;
-        }
-
-        this.styles = StyleSheet.create({ image: { width, height } });
-        if (this.hasMounted) {
-          // guard `this.setState` to be valid
-          this.setState({ height });
-          onHeightChange(height);
-        }
-      } catch (ex) {
-        if (this.props.onError) {
-          this.props.onError(ex);
-        }
-      }
+  useEffect(() => {
+    setInitialImageHeight();
+    return () => {
+      hasMounted = false;
+      updateSequence = null;
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    hasMounted = true;
+    updateImageHeight();
+  }, [props]);
+
+  return (
+    <Image
+      source={source}
+      style={[styles.image, style]}
+      {...restProps}
+    />
+  );
+
+}
+
+AutoHeightImage.propTypes = {
+  ...ImagePropTypes,
+  width: PropTypes.number.isRequired,
+  onHeightChange: PropTypes.func
+}
+
+AutoHeightImage.defaultProps = {
+  onHeightChange: NOOP
+};
+
+export default class AutoHeightImage extends PureComponent {
+
 
   render() {
     // remove `width` prop from `restProps`
-    const { source, style, width, ...restProps } = this.props;
-    return (
-      <Image
-        source={source}
-        style={[this.styles.image, style]}
-        {...restProps}
-      />
-    );
+    
   }
 }
